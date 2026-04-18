@@ -1,0 +1,48 @@
+name: DevSecOps CI Pipeline
+
+# Trigger the workflow on push or pull request to the main branch
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security_scan:
+    name: Execute Security Scanners
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Download a copy of the repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Set up a Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Run Bandit (SAST) 
+      # Scans Python code for common security issues (e.g., shell=True, weak hashes)
+      - name: Run Bandit (Static Analysis)
+        run: |
+          pip install bandit
+          bandit -r . -v || true
+
+      # Run pip-audit (SCA) 
+      # Checks for known vulnerabilities (CVEs) in dependencies listed in requirements.txt
+      - name: Run pip-audit (Dependency Scanning)
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements_insecure.txt || true
+
+      # Run TruffleHog (Secret Scanning)
+      # Detects hardcoded secrets like API keys, passwords, and tokens
+      - name: Run Secret Scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified || true
